@@ -1,0 +1,25 @@
+{
+  "name": "leciel-flare-nuxt4",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "nuxt dev",
+    "build": "nuxt build",
+    "preview": "nuxt preview",
+    "generate": "nuxt generate",
+    "deploy": "nuxt build && wrangler deploy --env production",
+    "postinstall": "nuxt prepare && node scripts/patch-unenv.mjs"
+  },
+  "dependencies": {
+    "@nuxt/ui": "^4.1.0",
+    "@vueuse/nuxt": "^14.0.0",
+    "nuxt": "^4.2.1",
+    "nuxt-auth-utils": "^0.5.25",
+    "typescript": "^5.9.3",
+    "vue": "^3.5.24"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20251115.0",
+    "wrangler": "^4.51.0"
+  }
+}

@@ -1,0 +1,108 @@
+# =============================================================================
+# Cloudflare Workers設定ファイル (テンプレート)
+# =============================================================================
+# このファイルをコピーして wrangler.toml を作成し、環境固有の値に置き換えてください
+# コピーコマンド: cp wrangler.toml.example wrangler.toml
+# =============================================================================
+
+# Worker名（Cloudflareダッシュボードに表示される名前）
+name = "leciel-flare"
+
+# ビルド後のエントリーポイント（Nuxtが自動生成）
+main = ".output/server/index.mjs"
+
+# Cloudflare Workers APIの互換性日付
+# この日付以降のAPIの変更は適用されません
+compatibility_date = "2025-11-16"
+
+# Node.js互換性フラグ（Node.js APIを使用するために必要）
+compatibility_flags = ["nodejs_compat"]
+
+# =============================================================================
+# 静的アセット設定
+# =============================================================================
+[assets]
+binding = "ASSETS"  # コード内でアクセスする際のバインディング名
+directory = ".output/public"  # 静的ファイルのディレクトリ
+
+# =============================================================================
+# ローカル開発・プレビュー環境用のバインディング
+# =============================================================================
+# これらの設定はローカル開発時（wrangler dev）やプレビュー時に使用されます
+
+# --- R2バケット（オブジェクトストレージ） ---
+[[r2_buckets]]
+binding = "MY_BUCKET"  # コード内で env.MY_BUCKET としてアクセス
+bucket_name = "flare-bucket-local"  # ローカル開発用のバケット名
+preview_bucket_name = "flare-bucket-local"  # プレビュー環境用のバケット名
+
+# --- KVネームスペース: アップロードメタデータ ---
+[[kv_namespaces]]
+binding = "UPLOAD_METADATA"  # コード内で env.UPLOAD_METADATA としてアクセス
+id = "preview_id"  # ローカル開発用のダミーID
+preview_id = "preview_id"  # プレビュー環境用のダミーID
+
+# --- KVネームスペース: 認証セッション ---
+[[kv_namespaces]]
+binding = "AUTH_SESSIONS"  # コード内で env.AUTH_SESSIONS としてアクセス
+id = "preview_id"  # ローカル開発用のダミーID
+preview_id = "preview_id"  # プレビュー環境用のダミーID
+
+# =============================================================================
+# 本番環境用の設定
+# =============================================================================
+# デプロイ時（wrangler deploy --env production）に使用される設定
+# 以下のプレースホルダーを実際の値に置き換えてください
+# =============================================================================
+
+[env.production]
+name = "leciel-flare"  # 本番環境のWorker名
+
+# --- R2バケット（本番環境） ---
+[[env.production.r2_buckets]]
+binding = "MY_BUCKET"
+# 本番環境用のR2バケット名を指定
+# 作成コマンド: npx wrangler r2 bucket create YOUR_BUCKET_NAME
+bucket_name = "YOUR_R2_BUCKET_NAME"  # 例: flare-bucket
+
+# --- KVネームスペース: アップロードメタデータ（本番環境） ---
+[[env.production.kv_namespaces]]
+binding = "UPLOAD_METADATA"
+# KV namespace IDを指定（UUIDv4形式の文字列）
+# 作成コマンド: npx wrangler kv namespace create UPLOAD_METADATA
+# ID確認コマンド: npx wrangler kv namespace list
+id = "YOUR_UPLOAD_METADATA_KV_NAMESPACE_ID"
+
+# --- KVネームスペース: 認証セッション（本番環境） ---
+[[env.production.kv_namespaces]]
+binding = "AUTH_SESSIONS"
+# KV namespace IDを指定（UUIDv4形式の文字列）
+# 作成コマンド: npx wrangler kv namespace create AUTH_SESSIONS
+# ID確認コマンド: npx wrangler kv namespace list
+id = "YOUR_AUTH_SESSIONS_KV_NAMESPACE_ID"
+
+# =============================================================================
+# 環境変数の設定
+# =============================================================================
+# 本番環境で必要な環境変数を設定します
+# 注意: CLIENT_SECRETなどの機密情報は wrangler secrets で管理してください
+
+[env.production.vars]
+# サイトURL（OAuth2リダイレクトURLの生成に使用）
+# 例: https://leciel-flare.workers.dev または独自ドメイン
+# 注意: 末尾のスラッシュは不要です
+NUXT_PUBLIC_SITE_URL = "https://YOUR_DOMAIN_HERE"
+
+# Discord Client ID（公開情報なのでvarsで管理可能）
+NUXT_OAUTH_DISCORD_CLIENT_ID = "YOUR_DISCORD_CLIENT_ID"
+
+# Discord サーバーID（アクセス制限用）
+NUXT_DISCORD_GUILD_ID = "YOUR_DISCORD_GUILD_ID"
+
+# 注意: 以下の機密情報は wrangler secrets コマンドで別途設定してください
+# - NUXT_OAUTH_DISCORD_CLIENT_SECRET
+# - NUXT_SESSION_PASSWORD
+#
+# 設定コマンド:
+#   npx wrangler secret put NUXT_OAUTH_DISCORD_CLIENT_SECRET --env production
+#   npx wrangler secret put NUXT_SESSION_PASSWORD --env production
