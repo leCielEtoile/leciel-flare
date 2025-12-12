@@ -4,31 +4,16 @@
  * ディレクトリ一覧で使用されるカード形式のアイテム表示
  * UI_REQUIREMENTS.md セクション4.2-4.3に準拠
  */
-import type { FileItem, ContextMenuItem } from '~/types'
+import type { FileItem } from '~/types'
 import { formatFileSize } from '~/utils/formatter'
-import ContextMenu from '~/components/common/ContextMenu.vue'
-import ModalDeleteConfirm from '~/components/modal/DeleteConfirm.vue'
 
 const props = defineProps<{
   item: FileItem
 }>()
 
 const emit = defineEmits<{
-  delete: []
+  contextmenu: [event: MouseEvent, item: FileItem]
 }>()
-
-const { user } = useAuth()
-const { copyPath, copyLink } = useClipboard()
-
-// コンテキストメニュー
-const contextMenu = ref({
-  show: false,
-  x: 0,
-  y: 0
-})
-
-// 削除確認モーダル
-const showDeleteModal = ref(false)
 
 // アイコン判定
 const icon = computed(() => {
@@ -167,118 +152,36 @@ const formattedSize = computed(() => {
 const isFolder = computed(() => props.item.type === 'folder')
 
 // 右クリックメニュー表示
-const handleContextMenu = (e) => {
+const handleContextMenu = (e: MouseEvent) => {
   e.preventDefault()
   e.stopPropagation()
-  contextMenu.value = {
-    show: true,
-    x: e.clientX,
-    y: e.clientY
-  }
-}
-
-// コンテキストメニュー項目
-const menuItems = computed<ContextMenuItem[]>(() => {
-  const items: ContextMenuItem[] = []
-
-  // 開く
-  items.push({
-    label: '開く',
-    icon: isFolder.value ? 'i-heroicons-folder-open' : 'i-heroicons-arrow-top-right-on-square',
-    action: handleClick
-  })
-
-  // パスをコピー
-  items.push({
-    label: 'パスをコピー',
-    icon: 'i-heroicons-clipboard-document',
-    action: () => copyPath(props.item.path)
-  })
-
-  // リンクをコピー
-  items.push({
-    label: 'リンクをコピー',
-    icon: 'i-heroicons-link',
-    action: () => copyLink(props.item.path)
-  })
-
-  // 認証済みユーザーのみ削除を表示
-  if (user.value) {
-    items.push({ divider: true })
-    items.push({
-      label: '削除',
-      icon: 'i-heroicons-trash',
-      danger: true,
-      action: () => {
-        showDeleteModal.value = true
-      }
-    })
-  }
-
-  return items
-})
-
-// メニューを閉じる
-const closeContextMenu = () => {
-  contextMenu.value.show = false
-}
-
-// メニュー選択
-const handleMenuSelect = (item: ContextMenuItem) => {
-  if (item.action) {
-    item.action()
-  }
-}
-
-// 削除完了後の処理
-const handleDeleted = () => {
-  emit('delete')
+  emit('contextmenu', e, props.item)
 }
 </script>
 
 <template>
-  <div>
-    <UCard
-      @click="handleClick"
-      @contextmenu="handleContextMenu"
-      class="cursor-pointer hover:ring-2 hover:ring-blue-500 transition-all"
-    >
-      <div class="flex flex-col items-center space-y-2">
-        <!-- アイコン -->
-        <UIcon
-          :name="icon"
-          class="w-12 h-12"
-          :class="iconColor"
-        />
+  <UCard
+    @click="handleClick"
+    @contextmenu="handleContextMenu"
+    class="cursor-pointer hover:ring-2 hover:ring-blue-500 transition-all"
+  >
+    <div class="flex flex-col items-center space-y-2">
+      <!-- アイコン -->
+      <UIcon
+        :name="icon"
+        class="w-12 h-12"
+        :class="iconColor"
+      />
 
-        <!-- ファイル/フォルダ名 -->
-        <p class="text-sm font-medium text-center truncate w-full" :title="item.name">
-          {{ item.name }}
-        </p>
+      <!-- ファイル/フォルダ名 -->
+      <p class="text-sm font-medium text-center truncate w-full" :title="item.name">
+        {{ item.name }}
+      </p>
 
-        <!-- ファイルサイズ -->
-        <p v-if="item.type !== 'folder' && formattedSize" class="text-xs text-gray-500">
-          {{ formattedSize }}
-        </p>
-      </div>
-    </UCard>
-
-    <!-- コンテキストメニュー -->
-    <ContextMenu
-      :show="contextMenu.show"
-      :items="menuItems"
-      :x="contextMenu.x"
-      :y="contextMenu.y"
-      @close="closeContextMenu"
-      @select="handleMenuSelect"
-    />
-
-    <!-- 削除確認モーダル -->
-    <ModalDeleteConfirm
-      :show="showDeleteModal"
-      :item="item"
-      @close="showDeleteModal = false"
-      @deleted="handleDeleted"
-    />
-  </div>
+      <!-- ファイルサイズ -->
+      <p v-if="item.type !== 'folder' && formattedSize" class="text-xs text-gray-500">
+        {{ formattedSize }}
+      </p>
+    </div>
+  </UCard>
 </template>
