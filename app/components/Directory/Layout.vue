@@ -7,6 +7,7 @@ import type { FileItem, BreadcrumbItem } from '~/types'
 import FileItemComponent from '~/components/directory/FileItem.vue'
 import ContextMenu from '~/components/common/ContextMenu.vue'
 import ModalCreateFolder from '~/components/modal/CreateFolder.vue'
+import ModalDeleteConfirm from '~/components/modal/DeleteConfirm.vue'
 
 interface DirectoryLayoutProps {
   items: FileItem[] | null | undefined
@@ -28,13 +29,17 @@ const emit = defineEmits<{
 }>()
 
 const { user } = useAuth()
+const { copyPath, copyLink } = useClipboard()
 
 // コンテキストメニューとモーダル
 const {
   fileInputRef,
   contextMenu,
   showFolderDialog,
-  handleContextMenu,
+  selectedItem,
+  menuType,
+  handleBackgroundContextMenu,
+  handleItemContextMenu,
   openFileDialog,
   handleFileSelect,
   closeContextMenu,
@@ -42,6 +47,33 @@ const {
   openFolderDialog,
   closeFolderDialog
 } = useDirectoryView()
+
+// 削除確認モーダル
+const showDeleteModal = ref(false)
+const itemToDelete = ref<FileItem | null>(null)
+
+// アイテムを開く
+const openItem = (item: FileItem) => {
+  if (item.type === 'folder') {
+    const folderPath = item.path.endsWith('/') ? item.path : `${item.path}/`
+    navigateTo(`/dir/${folderPath}`)
+  } else {
+    window.open(`/file/${item.path}`, '_blank')
+  }
+}
+
+// 削除モーダルを開く
+const openDeleteModal = (item: FileItem) => {
+  itemToDelete.value = item
+  showDeleteModal.value = true
+}
+
+// 削除完了後
+const handleDeleted = () => {
+  showDeleteModal.value = false
+  itemToDelete.value = null
+  emit('fileDelete')
+}
 
 // キーボードショートカット
 useDirectoryKeyboard(openFileDialog, () => emit('refresh'))
@@ -51,7 +83,15 @@ const contextMenuItems = useDirectoryContextMenu(
   openFileDialog,
   () => emit('refresh'),
   computed(() => !!user.value),
-  openFolderDialog
+  openFolderDialog,
+  selectedItem,
+  menuType,
+  {
+    onOpenItem: openItem,
+    onCopyPath: copyPath,
+    onCopyLink: copyLink,
+    onDeleteItem: openDeleteModal
+  }
 )
 
 // 統計情報
@@ -71,7 +111,10 @@ const handleFolderCreated = () => {
 </script>
 
 <template>
-  <div class="directory-view" @contextmenu="handleContextMenu">
+  <div
+    class="directory-view min-h-[calc(100vh-180px)] flex flex-col"
+    @contextmenu="handleBackgroundContextMenu"
+  >
     <!-- 隠しファイル入力 -->
     <input
       ref="fileInputRef"
@@ -82,7 +125,11 @@ const handleFolderCreated = () => {
     />
 
     <!-- パンくずナビゲーション -->
-    <UBreadcrumb v-if="showBreadcrumbs && breadcrumbs.length > 0" :links="breadcrumbs" class="mb-6" />
+    <UBreadcrumb
+      v-if="showBreadcrumbs && breadcrumbs.length > 0"
+      :links="breadcrumbs"
+      class="mb-6"
+    />
 
     <!-- 統計情報 -->
     <UCard v-if="statistics" class="mb-4">
@@ -108,17 +155,31 @@ const handleFolderCreated = () => {
     </UAlert>
 
     <!-- ファイル一覧 -->
-    <div v-else-if="items?.length" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
-      <FileItemComponent v-for="item in items" :key="item.path" :item="item" @delete="emit('fileDelete')" />
+    <div
+      v-else-if="items?.length"
+      class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4"
+    >
+      <FileItemComponent
+        v-for="item in items"
+        :key="item.path"
+        :item="item"
+        @contextmenu="handleItemContextMenu"
+      />
     </div>
 
     <!-- 空の場合 -->
     <UCard v-else class="text-center py-12">
-      <UIcon name="i-heroicons-folder-open" class="w-16 h-16 mx-auto text-gray-300 dark:text-gray-600 mb-4" />
+      <UIcon
+        name="i-heroicons-folder-open"
+        class="w-16 h-16 mx-auto text-gray-300 dark:text-gray-600 mb-4"
+      />
       <p class="text-gray-500 dark:text-gray-400">このディレクトリは空です</p>
     </UCard>
 
-    <!-- コンテキストメニュー -->
+    <!-- 空白領域を埋める（右クリック領域を拡張） -->
+    <div class="flex-grow min-h-[100px]"></div>
+
+    <!-- コンテキストメニュー（一元管理） -->
     <ContextMenu
       :show="contextMenu.show"
       :items="contextMenuItems"
@@ -134,6 +195,15 @@ const handleFolderCreated = () => {
       :current-path="currentPath"
       @close="closeFolderDialog"
       @created="handleFolderCreated"
+    />
+
+    <!-- 削除確認モーダル（一元管理） -->
+    <ModalDeleteConfirm
+      v-if="itemToDelete"
+      :show="showDeleteModal"
+      :item="itemToDelete"
+      @close="showDeleteModal = false; itemToDelete = null"
+      @deleted="handleDeleted"
     />
   </div>
 </template>

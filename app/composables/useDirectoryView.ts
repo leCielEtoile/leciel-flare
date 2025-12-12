@@ -2,6 +2,7 @@
  * ディレクトリビュー共通ロジック
  * dir/index.vue と dir/[...path].vue で共有される機能を提供
  */
+import type { FileItem } from '~/types'
 
 /**
  * DropZoneコンポーネントの公開インターフェース
@@ -22,10 +23,30 @@ export function useDirectoryView() {
 
   const showFolderDialog = ref(false)
 
-  // 右クリックメニュー表示
-  const handleContextMenu = (e: MouseEvent) => {
+  // 選択中のアイテム（ファイル/フォルダの右クリック時）
+  const selectedItem = ref<FileItem | null>(null)
+
+  // メニューの種類（背景 or アイテム）
+  const menuType = ref<'background' | 'item'>('background')
+
+  // 背景の右クリックメニュー表示
+  const handleBackgroundContextMenu = (e: MouseEvent) => {
+    e.preventDefault()
+    selectedItem.value = null
+    menuType.value = 'background'
+    contextMenu.value = {
+      show: true,
+      x: e.clientX,
+      y: e.clientY
+    }
+  }
+
+  // アイテムの右クリックメニュー表示
+  const handleItemContextMenu = (e: MouseEvent, item: FileItem) => {
     e.preventDefault()
     e.stopPropagation()
+    selectedItem.value = item
+    menuType.value = 'item'
     contextMenu.value = {
       show: true,
       x: e.clientX,
@@ -75,7 +96,10 @@ export function useDirectoryView() {
     fileInputRef,
     contextMenu,
     showFolderDialog,
-    handleContextMenu,
+    selectedItem,
+    menuType,
+    handleBackgroundContextMenu,
+    handleItemContextMenu,
     openFileDialog,
     handleFileSelect,
     closeContextMenu,
@@ -118,40 +142,79 @@ export function useDirectoryContextMenu(
   openFileDialog: () => void,
   refresh: () => void,
   isLoggedIn: ComputedRef<boolean>,
-  openFolderDialog: () => void
+  openFolderDialog: () => void,
+  selectedItem: Ref<FileItem | null>,
+  menuType: Ref<'background' | 'item'>,
+  callbacks: {
+    onOpenItem?: (item: FileItem) => void
+    onCopyPath?: (path: string) => void
+    onCopyLink?: (path: string) => void
+    onDeleteItem?: (item: FileItem) => void
+  }
 ) {
   return computed(() => {
-    const items = []
+    const items: any[] = []
 
-    // アップロード（ログイン時のみ）
-    if (isLoggedIn.value) {
-      items.push({
-        label: 'ファイルをアップロード',
-        icon: 'i-heroicons-cloud-arrow-up',
-        shortcut: '⌘U',
-        action: () => {
-          openFileDialog()
-        }
-      })
-      items.push({
-        label: '新しいフォルダ',
-        icon: 'i-heroicons-folder-plus',
-        action: () => {
-          openFolderDialog()
-        }
-      })
-      items.push({ divider: true })
-    }
+    if (menuType.value === 'item' && selectedItem.value) {
+      // アイテム用メニュー
+      const item = selectedItem.value
+      const isFolder = item.type === 'folder'
 
-    // 更新（常に表示）
-    items.push({
-      label: '更新',
-      icon: 'i-heroicons-arrow-path',
-      shortcut: '⌘R',
-      action: () => {
-        refresh()
+      // 開く
+      items.push({
+        label: '開く',
+        icon: isFolder ? 'i-heroicons-folder-open' : 'i-heroicons-arrow-top-right-on-square',
+        action: () => callbacks.onOpenItem?.(item)
+      })
+
+      // パスをコピー
+      items.push({
+        label: 'パスをコピー',
+        icon: 'i-heroicons-clipboard-document',
+        action: () => callbacks.onCopyPath?.(item.path)
+      })
+
+      // リンクをコピー
+      items.push({
+        label: 'リンクをコピー',
+        icon: 'i-heroicons-link',
+        action: () => callbacks.onCopyLink?.(item.path)
+      })
+
+      // 削除（認証済みのみ）
+      if (isLoggedIn.value) {
+        items.push({ divider: true })
+        items.push({
+          label: '削除',
+          icon: 'i-heroicons-trash',
+          danger: true,
+          action: () => callbacks.onDeleteItem?.(item)
+        })
       }
-    })
+    } else {
+      // 背景用メニュー
+      if (isLoggedIn.value) {
+        items.push({
+          label: 'ファイルをアップロード',
+          icon: 'i-heroicons-cloud-arrow-up',
+          shortcut: '⌘U',
+          action: openFileDialog
+        })
+        items.push({
+          label: '新しいフォルダ',
+          icon: 'i-heroicons-folder-plus',
+          action: openFolderDialog
+        })
+        items.push({ divider: true })
+      }
+
+      items.push({
+        label: '更新',
+        icon: 'i-heroicons-arrow-path',
+        shortcut: '⌘R',
+        action: refresh
+      })
+    }
 
     return items
   })
